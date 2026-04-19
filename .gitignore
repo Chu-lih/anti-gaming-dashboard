@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# SQLite(DB 可用 seed_data.py 重新生成,不入版控)
+database.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
