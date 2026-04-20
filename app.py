@@ -344,6 +344,67 @@ def api_rules_update():
     return jsonify({"ok": True, "rule_id": rule_id, "rule_code": row["rule_code"]})
 
 
+@app.route("/api/inbox-data")
+def api_inbox_data():
+    """Inbox 頁的 AJAX 篩選資料來源(stats + flags),JSON 回傳"""
+    db = get_db()
+    severity_filter = request.args.get("severity", "").strip()
+    rule_filter = request.args.get("rule", "").strip()
+    status_filter = request.args.get("status", "pending").strip()
+
+    where: list[str] = []
+    params: list = []
+    if severity_filter in ("Low", "Medium", "High"):
+        where.append("r.severity_level = ?")
+        params.append(severity_filter)
+    if rule_filter:
+        where.append("r.rule_code = ?")
+        params.append(rule_filter)
+    if status_filter and status_filter != "all":
+        where.append("f.resolution_status = ?")
+        params.append(status_filter)
+
+    sql = """
+        SELECT f.flag_id, f.session_id, f.agent_id, f.agent_name, f.module_name,
+               f.flag_timestamp, f.resolution_status,
+               r.rule_code, r.rule_name, r.severity_level
+        FROM FlaggedSessions f
+        JOIN ComplianceRules r ON f.rule_violated_id = r.rule_id
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += """
+        ORDER BY
+          CASE r.severity_level
+              WHEN 'High' THEN 0
+              WHEN 'Medium' THEN 1
+              WHEN 'Low' THEN 2
+          END,
+          f.flag_timestamp DESC
+    """
+    flags = [dict(r) for r in db.execute(sql, params).fetchall()]
+
+    stats_row = db.execute(
+        """
+        SELECT
+          SUM(CASE WHEN r.severity_level='High'   AND f.resolution_status='pending' THEN 1 ELSE 0 END) AS high_pending,
+          SUM(CASE WHEN r.severity_level='Medium' AND f.resolution_status='pending' THEN 1 ELSE 0 END) AS medium_pending,
+          SUM(CASE WHEN r.severity_level='Low'    AND f.resolution_status='pending' THEN 1 ELSE 0 END) AS low_pending,
+          SUM(CASE WHEN f.resolution_status='pending' THEN 1 ELSE 0 END) AS total_pending,
+          COUNT(*) AS total_all
+        FROM FlaggedSessions f
+        JOIN ComplianceRules r ON f.rule_violated_id = r.rule_id
+        """
+    ).fetchone()
+
+    return jsonify(
+        {
+            "stats": {k: (stats_row[k] or 0) for k in stats_row.keys()},
+            "flags": flags,
+        }
+    )
+
+
 @app.route("/api/rescan", methods=["POST"])
 def api_rescan():
     # 另開獨立連線:rule_engine 的 RuleRecord/SessionRecord unpack 需 tuple,
