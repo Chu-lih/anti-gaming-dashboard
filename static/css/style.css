@@ -1,15 +1,61 @@
-/* Compliance Sentinel — 少量自訂樣式(其餘靠 Tailwind utility) */
+/* ================================================================
+ * Compliance Sentinel — Theme Tokens & Custom Styles
+ *
+ * 顏色 token 架構:
+ *   *  --color-slate-* 以 R G B 通道值定義(無 alpha),方便 Tailwind 的
+ *      `rgb(var(--x) / <alpha-value>)` 模式支援 `bg-slate-900/50` 這類透明度
+ *   *  :root 為預設深色主題;[data-theme="light"] 翻轉對應值
+ *   *  切換 theme 只要在 <html> 或 <body> 加上 `data-theme="light"`,
+ *      所有 slate-* utility 會自動反轉(HTML class 一律不動)
+ *
+ * 強色(red / amber / yellow / sky / emerald / rose)保留 Tailwind 預設值,
+ * SOC 風格下深淺 theme 都應讓嚴重度訊號維持一致警示感
+ * ================================================================ */
 
-/* 讓 blinking dot 有心跳感(資安風) */
+:root {
+  /* Dark theme(預設)— 與原 slate hex 完全對應 */
+  --color-slate-50:   248 250 252;   /* #f8fafc */
+  --color-slate-100:  241 245 249;   /* #f1f5f9 */
+  --color-slate-200:  226 232 240;   /* #e2e8f0 */
+  --color-slate-300:  203 213 225;   /* #cbd5e1 */
+  --color-slate-400:  148 163 184;   /* #94a3b8 */
+  --color-slate-500:  100 116 139;   /* #64748b */
+  --color-slate-600:   71  85 105;   /* #475569 */
+  --color-slate-700:   51  65  85;   /* #334155 */
+  --color-slate-800:   30  41  59;   /* #1e293b */
+  --color-slate-900:   15  23  42;   /* #0f172a */
+  --color-slate-950:    2   6  23;   /* #020617 */
+}
+
+[data-theme="light"] {
+  /* Light theme — 翻轉:底色變淺、文字變深(只做主色階,其餘繼承自 dark 以 fallback)*/
+  --color-slate-950:  248 250 252;   /* 整體背景 */
+  --color-slate-900:  255 255 255;   /* sidebar / 卡片面 */
+  --color-slate-800:  226 232 240;   /* 邊框 / 分隔線 */
+  --color-slate-700:  203 213 225;
+  --color-slate-600:  148 163 184;
+  --color-slate-500:  100 116 139;
+  --color-slate-400:   71  85 105;
+  --color-slate-300:   51  65  85;
+  --color-slate-200:   30  41  59;   /* 主要文字 */
+  --color-slate-100:   15  23  42;
+  --color-slate-50:     2   6  23;
+}
+
+/* ================================================================
+ * Custom animations / utilities
+ * ================================================================ */
+
+/* 資安風心跳紅點 */
 @keyframes soc-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.55); }
-  50%      { opacity: 0.55; box-shadow: 0 0 0 6px rgba(248, 113, 113, 0); }
+  0%, 100% { opacity: 1;    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.55); }
+  50%      { opacity: 0.55; box-shadow: 0 0 0 6px rgba(248, 113, 113, 0);  }
 }
 .pulse-dot {
   animation: soc-pulse 1.8s infinite;
 }
 
-/* 數字 KPI 卡片 hover 微浮 */
+/* KPI 卡片 hover 微浮 */
 .kpi-card {
   transition: transform 150ms ease, border-color 150ms ease;
 }
@@ -22,7 +68,7 @@ tbody tr.flag-row {
   transition: background-color 120ms ease;
 }
 tbody tr.flag-row:hover {
-  background-color: rgba(30, 41, 59, 0.55); /* slate-800/55 */
+  background-color: rgb(var(--color-slate-800) / 0.55);
   cursor: pointer;
 }
 
@@ -35,13 +81,13 @@ tbody tr.flag-row:hover {
   animation: toast-slide-in 180ms ease-out;
 }
 
-/* 隱藏 native select 的箭頭(配合自製圖示時用) */
+/* 隱藏 native select 箭頭(自製 CSS 箭頭) */
 select.clean-select {
   appearance: none;
   -webkit-appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, #64748b 50%),
-    linear-gradient(135deg, #64748b 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, rgb(var(--color-slate-500)) 50%),
+    linear-gradient(135deg, rgb(var(--color-slate-500)) 50%, transparent 50%);
   background-position:
     calc(100% - 15px) 52%,
     calc(100% - 10px) 52%;
@@ -52,4 +98,17 @@ select.clean-select {
 /* 等寬數字 */
 .num {
   font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+ * Forensic Timeline — 供 timeline.html 使用的 SVG 脈衝
+ * ================================================================ */
+@keyframes tab-switch-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%      { transform: scale(1.25); opacity: 0.7; }
+}
+.tab-switch-marker {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: tab-switch-pulse 1.4s ease-in-out infinite;
 }

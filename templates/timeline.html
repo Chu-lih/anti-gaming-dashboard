@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Forensic Timeline · #{{ flag.flag_id }}{% endblock %}
+
+{% set sev = flag.severity_level %}
+{% set sev_cls = {
+  'High':   'bg-red-500/15 text-red-300 border-red-500/40',
+  'Medium': 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+  'Low':    'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+}[sev] %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<div class="text-xs text-slate-500 mb-4">
+  <a href="{{ url_for('inbox') }}" class="hover:text-slate-300 inline-flex items-center gap-1">
+    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+    Risk Inbox
+  </a>
+  <span class="mx-2 text-slate-700">/</span>
+  <span class="text-slate-400">Forensic Timeline</span>
+  <span class="mx-2 text-slate-700">/</span>
+  <span class="text-slate-200 font-mono">Flag #{{ flag.flag_id }}</span>
+</div>
+
+<!-- Session Context Card -->
+<div class="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden mb-6">
+  <div class="grid grid-cols-5 divide-x divide-slate-800">
+    <!-- Agent block -->
+    <div class="col-span-2 p-5">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Subject</div>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-slate-200 font-semibold border border-slate-700">
+          {{ flag.agent_name[0] }}
+        </div>
+        <div>
+          <div class="text-lg text-white font-semibold">{{ flag.agent_name }}</div>
+          <div class="text-xs text-slate-500 font-mono">{{ flag.agent_id }} · session <span class="text-slate-400">{{ flag.session_id }}</span></div>
+        </div>
+      </div>
+      <div class="mt-4 text-xs">
+        <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">Module</div>
+        <div class="text-slate-300">{{ flag.module_name }}</div>
+      </div>
+    </div>
+
+    <!-- Timing block -->
+    <div class="col-span-1 p-5">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Flag Time</div>
+      <div class="text-sm text-slate-300 font-mono num">{{ flag.flag_timestamp }}</div>
+      <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Actual</div>
+          <div class="text-red-300 font-mono num text-base">{{ flag.completion_seconds }}s</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Avg</div>
+          <div class="text-slate-400 font-mono num text-base">{{ flag.avg_completion_seconds }}s</div>
+        </div>
+      </div>
+      {% if flag.avg_completion_seconds and flag.avg_completion_seconds > 0 %}
+        {% set ratio_pct = ((flag.completion_seconds or 0) / flag.avg_completion_seconds * 100) | round(0, 'floor') | int %}
+        <div class="mt-2 text-[10px] text-slate-500">
+          <span class="text-red-300 font-mono num">{{ ratio_pct }}%</span> of expected
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Violated rules block -->
+    <div class="col-span-2 p-5">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Rules Violated <span class="text-slate-600">({{ rules_violated|length }})</span></div>
+      <div class="space-y-1.5">
+        {% for r in rules_violated %}
+          {% set rsev_cls = {
+            'High':   'bg-red-500/15 text-red-300 border-red-500/40',
+            'Medium': 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+            'Low':    'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+          }[r.severity_level] %}
+          <a href="{{ url_for('timeline', flag_id=r.flag_id) }}"
+             class="flex items-center gap-2 px-2.5 py-1.5 rounded border transition
+                    {% if r.is_current %}{{ rsev_cls }} ring-1 ring-slate-500/40{% else %}bg-slate-800/40 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600{% endif %}">
+            <span class="inline-block text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded border
+                         {% if not r.is_current %}{{ rsev_cls }}{% else %}bg-slate-900/40 border-slate-700 text-slate-300{% endif %}">
+              {{ r.severity_level }}
+            </span>
+            <span class="font-mono text-[11px]">{{ r.rule_code }}</span>
+            <span class="text-[11px] opacity-80">· {{ r.rule_name }}</span>
+            <span class="ml-auto text-[10px] font-mono text-slate-500">#{{ r.flag_id }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forensic Timeline SVG -->
+<div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5 mb-6">
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+        <svg class="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+        Forensic Event Timeline
+      </h2>
+      <p class="text-[11px] text-slate-500 mt-1">Reconstructed from session telemetry · hover any event for details</p>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-400"></span>session</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-sky-400 rounded-sm"></span>card swipe</span>
+      <span class="flex items-center gap-1.5">
+        <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10" fill="#ef4444"/></svg>
+        tab switch
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,10 10,0 0,0" fill="#fca5a5" opacity="0.7"/></svg>
+        tab return
+      </span>
+      <span class="flex items-center gap-1.5"><span class="text-purple-400 text-sm leading-none">★</span>quiz submit</span>
+    </div>
+  </div>
+
+  <div id="timeline-container" class="relative">
+    <svg id="timeline-svg" viewBox="0 0 1000 240" preserveAspectRatio="none" class="w-full" style="height: 240px;"></svg>
+    <div id="timeline-tooltip" class="hidden absolute pointer-events-none bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5 text-[11px] text-slate-100 shadow-xl z-10 whitespace-nowrap"></div>
+  </div>
+</div>
+
+<!-- Resolution Action Bar -->
+{% if flag.resolution_status == 'pending' %}
+<div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5" id="resolve-panel">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Resolution Action</h2>
+    <div class="text-[11px] text-slate-500">
+      signing as <span class="text-slate-300">{{ current_manager_name }}</span>
+      <span class="font-mono text-slate-600">({{ current_manager_id }})</span>
+    </div>
+  </div>
+
+  <label class="block text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Manager Justification Notes <span class="text-red-400">*</span></label>
+  <textarea id="resolve-notes" rows="3"
+            placeholder="例:經確認該業務員為新進員工,訓練未達標,要求重考。已通知其主管說明處置。"
+            class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded px-3 py-2 focus:outline-none focus:border-sky-500 placeholder-slate-600"></textarea>
+
+  <div class="mt-3 flex flex-wrap gap-2 justify-end">
+    <button data-action="approve"
+            class="resolve-btn flex items-center gap-2 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded transition">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      Approve (False Alarm)
+    </button>
+    <button data-action="void"
+            class="resolve-btn flex items-center gap-2 bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded transition">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+      Void & Require Retake
+    </button>
+    <button data-action="escalate"
+            class="resolve-btn flex items-center gap-2 bg-red-500/5 hover:bg-red-500/15 border border-red-500/40 hover:border-red-400 text-red-300 text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded transition">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
+      Escalate to HR
+    </button>
+  </div>
+</div>
+{% else %}
+<div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Resolution Record</h2>
+    {% set status_badge_cls = {
+      'approved':  'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+      'voided':    'bg-slate-700/50 text-slate-300 border-slate-600',
+      'escalated': 'bg-red-500/15 text-red-300 border-red-500/40',
+    }[flag.resolution_status] %}
+    <span class="inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border {{ status_badge_cls }}">
+      {{ flag.resolution_status }}
+    </span>
+  </div>
+  {% for a in audits %}
+  <div class="border-l-2 border-slate-700 pl-4 py-1">
+    <div class="text-xs text-slate-400">
+      <span class="text-slate-200 font-semibold">{{ a.manager_name }}</span>
+      <span class="font-mono text-slate-500">({{ a.manager_id }})</span>
+      marked as
+      <span class="text-slate-200 font-semibold uppercase">{{ a.action_taken }}</span>
+      on <span class="font-mono text-slate-400 num">{{ a.timestamp }}</span>
+    </div>
+    <blockquote class="mt-2 text-sm text-slate-300 bg-slate-950/60 border border-slate-800 rounded px-3 py-2 italic">
+      "{{ a.manager_justification_notes }}"
+    </blockquote>
+    <div class="mt-1.5 text-[10px] text-slate-600 font-mono">Audit #{{ a.audit_id }} · immutable record</div>
+  </div>
+  {% else %}
+  <div class="text-xs text-slate-500">No audit log entries — DB inconsistency detected.</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script id="timeline-data" type="application/json">{{ timeline_payload | tojson }}</script>
+<script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+{% endblock %}

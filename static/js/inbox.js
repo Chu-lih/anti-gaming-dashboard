@@ -23,12 +23,13 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function buildRow(f) {
+function buildRow(f, idx) {
   const sevCls = SEV_BADGE[f.severity_level] || '';
   const stCls  = STATUS_COLOR[f.resolution_status] || 'text-slate-400';
   const tlUrl  = `/timeline/${f.flag_id}`;
+  const zebra  = idx % 2 === 0 ? 'bg-slate-900/20' : '';
   return `
-    <tr class="flag-row" data-flag-id="${f.flag_id}" onclick="window.location='${tlUrl}'">
+    <tr class="flag-row ${zebra}" data-flag-id="${f.flag_id}" onclick="window.location='${tlUrl}'">
       <td class="px-4 py-3">
         <span class="inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border ${sevCls}">${escapeHtml(f.severity_level)}</span>
       </td>
@@ -69,6 +70,7 @@ function readFilters() {
     severity: document.getElementById('filter-severity').value,
     rule:     document.getElementById('filter-rule').value,
     status:   document.getElementById('filter-status').value,
+    agent:    document.getElementById('filter-agent').value.trim(),
   };
 }
 
@@ -83,15 +85,15 @@ function updateKpis(stats) {
 }
 
 async function loadInbox() {
-  const { severity, rule, status } = readFilters();
-  const qs = new URLSearchParams({ severity, rule, status });
+  const { severity, rule, status, agent } = readFilters();
+  const qs = new URLSearchParams({ severity, rule, status, agent });
   try {
     const r = await fetch(`/api/inbox-data?${qs}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
     const tbody = document.getElementById('flags-tbody');
     tbody.innerHTML = data.flags.length
-      ? data.flags.map(buildRow).join('')
+      ? data.flags.map((f, i) => buildRow(f, i)).join('')
       : emptyRow();
     updateKpis(data.stats);
     const scan = document.getElementById('status-last-scan');
@@ -129,10 +131,19 @@ document.addEventListener('DOMContentLoaded', () => {
   ['filter-severity', 'filter-rule', 'filter-status'].forEach(id => {
     document.getElementById(id).addEventListener('change', loadInbox);
   });
+
+  // Agent 搜尋用 debounce,避免每一鍵就打 API
+  let agentDebounce;
+  document.getElementById('filter-agent').addEventListener('input', () => {
+    clearTimeout(agentDebounce);
+    agentDebounce = setTimeout(loadInbox, 250);
+  });
+
   document.getElementById('filter-reset').addEventListener('click', () => {
     document.getElementById('filter-severity').value = '';
     document.getElementById('filter-rule').value = '';
     document.getElementById('filter-status').value = 'pending';
+    document.getElementById('filter-agent').value = '';
     loadInbox();
   });
   document.getElementById('btn-rescan').addEventListener('click', triggerRescan);

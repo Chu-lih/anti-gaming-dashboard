@@ -108,24 +108,42 @@ def root():
     return redirect(url_for("inbox"))
 
 
-@app.route("/inbox")
-def inbox():
-    db = get_db()
-    severity_filter = request.args.get("severity", "").strip()
-    rule_filter = request.args.get("rule", "").strip()
-    status_filter = request.args.get("status", "pending").strip()
+def _build_flag_filters(args) -> tuple[list[str], list, dict]:
+    """抽出 filter 建構邏輯供 /inbox 與 /api/inbox-data 共用。回傳 (where, params, echo)"""
+    severity = args.get("severity", "").strip()
+    rule = args.get("rule", "").strip()
+    status = args.get("status", "pending").strip()
+    agent = args.get("agent", "").strip()
 
     where: list[str] = []
     params: list = []
-    if severity_filter in ("Low", "Medium", "High"):
+    if severity in ("Low", "Medium", "High"):
         where.append("r.severity_level = ?")
-        params.append(severity_filter)
-    if rule_filter:
+        params.append(severity)
+    if rule:
         where.append("r.rule_code = ?")
-        params.append(rule_filter)
-    if status_filter and status_filter != "all":
+        params.append(rule)
+    if status and status != "all":
         where.append("f.resolution_status = ?")
-        params.append(status_filter)
+        params.append(status)
+    if agent:
+        where.append("(f.agent_name LIKE ? OR f.agent_id LIKE ?)")
+        pattern = f"%{agent}%"
+        params.extend([pattern, pattern])
+
+    return where, params, {
+        "severity": severity, "rule": rule, "status": status, "agent": agent,
+    }
+
+
+@app.route("/inbox")
+def inbox():
+    db = get_db()
+    where, params, echo = _build_flag_filters(request.args)
+    severity_filter = echo["severity"]
+    rule_filter = echo["rule"]
+    status_filter = echo["status"]
+    agent_filter = echo["agent"]
 
     sql = """
         SELECT f.flag_id, f.session_id, f.agent_id, f.agent_name, f.module_name,
@@ -172,6 +190,7 @@ def inbox():
         severity_filter=severity_filter,
         rule_filter=rule_filter,
         status_filter=status_filter,
+        agent_filter=agent_filter,
     )
 
 
@@ -225,12 +244,47 @@ def timeline(flag_id: int):
         (flag_id,),
     ).fetchall()
 
+    # 把「本 flag 的規則」與「同一 session 的其他 flag」合併成一份清單
+    rules_violated = [
+        {
+            "rule_code": row["rule_code"],
+            "rule_name": row["rule_name"],
+            "severity_level": row["severity_level"],
+            "flag_id": row["flag_id"],
+            "resolution_status": row["resolution_status"],
+            "is_current": True,
+        }
+    ]
+    for s in sibling_flags:
+        rules_violated.append({
+            "rule_code": s["rule_code"],
+            "rule_name": s["rule_name"],
+            "severity_level": s["severity_level"],
+            "flag_id": s["flag_id"],
+            "resolution_status": s["resolution_status"],
+            "is_current": False,
+        })
+
+    # SVG 渲染用的 JSON payload(前端 timeline.js 讀取)
+    timeline_payload = {
+        "flag_id": row["flag_id"],
+        "session_id": row["session_id"],
+        "module_name": row["module_name"],
+        "module_avg_seconds": row["avg_completion_seconds"],
+        "completion_seconds": row["completion_seconds"],
+        "quiz_score": row["quiz_score"],
+        "quiz_seconds": row["quiz_seconds"],
+        "tab_switch_count": row["tab_switch_count"],
+        "telemetry": telemetry,
+    }
+
     return render_template(
         "timeline.html",
         flag=row,
         telemetry=telemetry,
-        sibling_flags=sibling_flags,
+        rules_violated=rules_violated,
         audits=audits,
+        timeline_payload=timeline_payload,
     )
 
 
@@ -348,21 +402,7 @@ def api_rules_update():
 def api_inbox_data():
     """Inbox 頁的 AJAX 篩選資料來源(stats + flags),JSON 回傳"""
     db = get_db()
-    severity_filter = request.args.get("severity", "").strip()
-    rule_filter = request.args.get("rule", "").strip()
-    status_filter = request.args.get("status", "pending").strip()
-
-    where: list[str] = []
-    params: list = []
-    if severity_filter in ("Low", "Medium", "High"):
-        where.append("r.severity_level = ?")
-        params.append(severity_filter)
-    if rule_filter:
-        where.append("r.rule_code = ?")
-        params.append(rule_filter)
-    if status_filter and status_filter != "all":
-        where.append("f.resolution_status = ?")
-        params.append(status_filter)
+    where, params, _ = _build_flag_filters(request.args)
 
     sql = """
         SELECT f.flag_id, f.session_id, f.agent_id, f.agent_name, f.module_name,

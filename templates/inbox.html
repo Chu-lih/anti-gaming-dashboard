@@ -75,6 +75,15 @@
       {% endfor %}
     </select>
 
+    <div class="relative">
+      <svg class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+      </svg>
+      <input type="text" id="filter-agent" placeholder="Search agent…"
+             value="{{ agent_filter or '' }}"
+             class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded pl-7 pr-3 py-1.5 w-44 focus:outline-none focus:border-sky-500 placeholder-slate-500">
+    </div>
+
     <select id="filter-status" class="clean-select bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-3 py-1.5 pr-8 focus:outline-none focus:border-sky-500">
       <option value="pending"   {% if status_filter == 'pending' %}selected{% endif %}>Pending only</option>
       <option value="approved"  {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
@@ -122,7 +131,7 @@
                             'approved':'text-emerald-400',
                             'voided':'text-slate-400',
                             'escalated':'text-rose-400'}[st] %}
-          <tr class="flag-row" data-flag-id="{{ f.flag_id }}"
+          <tr class="flag-row odd:bg-slate-900/20" data-flag-id="{{ f.flag_id }}"
               onclick="window.location='{{ url_for('timeline', flag_id=f.flag_id) }}'">
             <td class="px-4 py-3">
               <span class="inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border {{ sev_cls }}">{{ sev }}</span>

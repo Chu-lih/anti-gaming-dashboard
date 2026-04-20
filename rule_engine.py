@@ -34,6 +34,7 @@ import sqlite3
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Type
 
@@ -56,6 +57,7 @@ class SessionRecord:
     quiz_seconds: int | None
     tab_switch_count: int
     telemetry_json: str | None
+    started_at: str | None
     module_avg_completion_seconds: int | None
 
 
@@ -215,12 +217,25 @@ def load_sessions(conn: sqlite3.Connection) -> list[SessionRecord]:
     rows = conn.execute(
         """SELECT s.session_id, s.agent_id, s.agent_name, s.module_id, s.module_name,
                   s.completion_seconds, s.quiz_score, s.quiz_seconds, s.tab_switch_count,
-                  s.telemetry_json, m.avg_completion_seconds
+                  s.telemetry_json, s.started_at, m.avg_completion_seconds
            FROM LearningSessions s
            LEFT JOIN Modules m ON s.module_id = m.module_id
            ORDER BY s.session_id"""
     ).fetchall()
     return [SessionRecord(*r) for r in rows]
+
+
+def _derive_flag_timestamp(started_at: str | None, completion_seconds: int | None) -> str | None:
+    """Flag 時間取「session 結束時刻」=(started_at + completion_seconds)。
+       反映現實中系統在 session 完成後立刻掃描 flag 的時間流。
+       若 started_at 缺失或不可 parse,回傳 None → DB 的 CURRENT_TIMESTAMP 接手 default。"""
+    if not started_at:
+        return None
+    try:
+        dt = datetime.fromisoformat(started_at)
+    except ValueError:
+        return None
+    return (dt + timedelta(seconds=completion_seconds or 0)).isoformat(sep=" ", timespec="seconds")
 
 
 # =============================================================
@@ -243,6 +258,7 @@ def run_engine(conn: sqlite3.Connection, *, dry_run: bool = False) -> list[dict]
 
     hits: list[dict] = []
     for sess in sessions:
+        flag_ts = _derive_flag_timestamp(sess.started_at, sess.completion_seconds)
         for rule, checker in checkers:
             if checker.check(sess):
                 hits.append({
@@ -254,6 +270,7 @@ def run_engine(conn: sqlite3.Connection, *, dry_run: bool = False) -> list[dict]
                     "rule_code": rule.rule_code,
                     "severity": rule.severity_level,
                     "telemetry_json": sess.telemetry_json,
+                    "flag_timestamp": flag_ts,
                 })
 
     if dry_run:
@@ -263,14 +280,25 @@ def run_engine(conn: sqlite3.Connection, *, dry_run: bool = False) -> list[dict]
     inserted = 0
     skipped = 0
     for h in hits:
-        cur = conn.execute(
-            """INSERT OR IGNORE INTO FlaggedSessions
-               (session_id, agent_id, agent_name, module_name,
-                rule_violated_id, session_telemetry_json)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (h["session_id"], h["agent_id"], h["agent_name"], h["module_name"],
-             h["rule_violated_id"], h["telemetry_json"]),
-        )
+        # flag_timestamp 若為 None 則讓 DB 使用 CURRENT_TIMESTAMP default
+        if h["flag_timestamp"] is None:
+            cur = conn.execute(
+                """INSERT OR IGNORE INTO FlaggedSessions
+                   (session_id, agent_id, agent_name, module_name,
+                    rule_violated_id, session_telemetry_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (h["session_id"], h["agent_id"], h["agent_name"], h["module_name"],
+                 h["rule_violated_id"], h["telemetry_json"]),
+            )
+        else:
+            cur = conn.execute(
+                """INSERT OR IGNORE INTO FlaggedSessions
+                   (session_id, agent_id, agent_name, module_name,
+                    rule_violated_id, flag_timestamp, session_telemetry_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (h["session_id"], h["agent_id"], h["agent_name"], h["module_name"],
+                 h["rule_violated_id"], h["flag_timestamp"], h["telemetry_json"]),
+            )
         if cur.rowcount > 0:
             inserted += 1
         else:

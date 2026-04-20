@@ -195,7 +195,7 @@ def build_sessions() -> list[dict]:
             "quiz_score": score, "quiz_seconds": quiz_sec,
             "tab_switch_count": tab,
             "telemetry_json": json.dumps(build_normal_telemetry(comp, tab), ensure_ascii=False),
-            "started_at": (now - timedelta(hours=random.randint(1, 72))).isoformat(sep=" "),
+            "started_at": (now - timedelta(hours=random.randint(1, 48))).isoformat(sep=" "),
         })
         sid += 1
 
@@ -291,7 +291,7 @@ def build_sessions() -> list[dict]:
             "quiz_score": score, "quiz_seconds": quiz_sec,
             "tab_switch_count": tab,
             "telemetry_json": json.dumps(telemetry, ensure_ascii=False),
-            "started_at": (now - timedelta(hours=random.randint(1, 72))).isoformat(sep=" "),
+            "started_at": (now - timedelta(hours=random.randint(1, 48))).isoformat(sep=" "),
         })
         sid += 1
 

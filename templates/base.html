@@ -6,14 +6,25 @@
   <title>{% block title %}Compliance Sentinel{% endblock %} · KGI Anti-Gaming</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    // 把 Tailwind 的 slate token 指向 CSS 變數,便於 data-theme 切換(dark/light)
+    // 使用 rgb(var(--x) / <alpha-value>) 模式以支援 `bg-slate-900/50` 透明度
+    const slateVar = (shade) => `rgb(var(--color-slate-${shade}) / <alpha-value>)`;
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: {
             mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
-          }
-        }
-      }
+          },
+          colors: {
+            slate: {
+               50: slateVar( 50), 100: slateVar(100), 200: slateVar(200),
+              300: slateVar(300), 400: slateVar(400), 500: slateVar(500),
+              600: slateVar(600), 700: slateVar(700), 800: slateVar(800),
+              900: slateVar(900), 950: slateVar(950),
+            },
+          },
+        },
+      },
     };
   </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
