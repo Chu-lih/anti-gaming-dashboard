@@ -291,7 +291,7 @@ def timeline(flag_id: int):
 @app.route("/rules")
 def rules_page():
     db = get_db()
-    rules = db.execute(
+    rule_rows = db.execute(
         """
         SELECT rule_id, rule_code, rule_name, description, parameter_json,
                severity_level, is_active, created_at
@@ -299,7 +299,31 @@ def rules_page():
         ORDER BY rule_id
         """
     ).fetchall()
-    return render_template("rules.html", rules=rules)
+
+    # 轉成 dict 並 pretty-print parameter_json 供 textarea 使用
+    rules = []
+    for r in rule_rows:
+        d = dict(r)
+        try:
+            d["parameter_json_pretty"] = json.dumps(
+                json.loads(r["parameter_json"]), indent=2, ensure_ascii=False
+            )
+        except json.JSONDecodeError:
+            d["parameter_json_pretty"] = r["parameter_json"]
+        rules.append(d)
+
+    # 最近 10 筆規則變更紀錄
+    recent_changes = db.execute(
+        """
+        SELECT change_id, rule_code, change_type, old_value, new_value,
+               manager_id, manager_name, timestamp
+        FROM RuleChangeLog
+        ORDER BY timestamp DESC, change_id DESC
+        LIMIT 10
+        """
+    ).fetchall()
+
+    return render_template("rules.html", rules=rules, recent_changes=recent_changes)
 
 
 # ============================================================
@@ -355,47 +379,80 @@ def api_resolve():
 
 @app.route("/api/rules/update", methods=["POST"])
 def api_rules_update():
+    """只處理 parameter_json 變更(toggle 走另一 endpoint)"""
     data = request.get_json(silent=True) or {}
     rule_id = data.get("rule_id")
     parameter_json = data.get("parameter_json")
-    is_active = data.get("is_active")
 
     if not isinstance(rule_id, int):
         return jsonify({"error": "rule_id (int) 必填"}), 400
+    if parameter_json is None:
+        return jsonify({"error": "parameter_json 必填"}), 400
+
+    try:
+        parsed = json.loads(parameter_json) if isinstance(parameter_json, str) else parameter_json
+        if not isinstance(parsed, dict):
+            raise ValueError("parameter_json 必須是 JSON 物件 (dict)")
+    except (ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"error": f"parameter_json 格式錯誤: {exc}"}), 400
 
     db = get_db()
     row = db.execute(
-        "SELECT rule_id, rule_code FROM ComplianceRules WHERE rule_id = ?",
+        "SELECT rule_id, rule_code, parameter_json FROM ComplianceRules WHERE rule_id = ?",
         (rule_id,),
     ).fetchone()
     if row is None:
         return jsonify({"error": f"Rule #{rule_id} 不存在"}), 404
 
-    updates: list[str] = []
-    params: list = []
+    new_json = json.dumps(parsed, ensure_ascii=False)
+    if new_json == row["parameter_json"]:
+        return jsonify({"ok": True, "rule_id": rule_id, "rule_code": row["rule_code"],
+                        "unchanged": True})
 
-    if parameter_json is not None:
-        try:
-            parsed = json.loads(parameter_json) if isinstance(parameter_json, str) else parameter_json
-            if not isinstance(parsed, dict):
-                raise ValueError("parameter_json 必須是 JSON 物件 (dict)")
-        except (ValueError, json.JSONDecodeError) as exc:
-            return jsonify({"error": f"parameter_json 格式錯誤: {exc}"}), 400
-        updates.append("parameter_json = ?")
-        params.append(json.dumps(parsed, ensure_ascii=False))
-
-    if is_active is not None:
-        val = 1 if is_active in (1, "1", True, "true", "True") else 0
-        updates.append("is_active = ?")
-        params.append(val)
-
-    if not updates:
-        return jsonify({"error": "沒有要更新的欄位"}), 400
-
-    params.append(rule_id)
-    db.execute(f"UPDATE ComplianceRules SET {', '.join(updates)} WHERE rule_id = ?", params)
+    db.execute(
+        "UPDATE ComplianceRules SET parameter_json = ? WHERE rule_id = ?",
+        (new_json, rule_id),
+    )
+    db.execute(
+        """INSERT INTO RuleChangeLog
+           (rule_id, rule_code, change_type, old_value, new_value, manager_id, manager_name)
+           VALUES (?, ?, 'parameter_update', ?, ?, ?, ?)""",
+        (rule_id, row["rule_code"], row["parameter_json"], new_json,
+         session["manager_id"], session["manager_name"]),
+    )
     db.commit()
     return jsonify({"ok": True, "rule_id": rule_id, "rule_code": row["rule_code"]})
+
+
+@app.route("/api/rules/toggle", methods=["POST"])
+def api_rules_toggle():
+    """切換規則 is_active 並寫入 RuleChangeLog"""
+    data = request.get_json(silent=True) or {}
+    rule_id = data.get("rule_id")
+    if not isinstance(rule_id, int):
+        return jsonify({"error": "rule_id (int) 必填"}), 400
+
+    db = get_db()
+    row = db.execute(
+        "SELECT rule_id, rule_code, is_active FROM ComplianceRules WHERE rule_id = ?",
+        (rule_id,),
+    ).fetchone()
+    if row is None:
+        return jsonify({"error": f"Rule #{rule_id} 不存在"}), 404
+
+    old_val = int(row["is_active"])
+    new_val = 0 if old_val else 1
+    db.execute("UPDATE ComplianceRules SET is_active = ? WHERE rule_id = ?", (new_val, rule_id))
+    db.execute(
+        """INSERT INTO RuleChangeLog
+           (rule_id, rule_code, change_type, old_value, new_value, manager_id, manager_name)
+           VALUES (?, ?, 'toggle_active', ?, ?, ?, ?)""",
+        (rule_id, row["rule_code"], str(old_val), str(new_val),
+         session["manager_id"], session["manager_name"]),
+    )
+    db.commit()
+    return jsonify({"ok": True, "rule_id": rule_id, "rule_code": row["rule_code"],
+                    "is_active": new_val})
 
 
 @app.route("/api/inbox-data")

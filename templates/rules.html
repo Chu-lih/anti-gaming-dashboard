@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Rules Engine{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+  <div>
+    <h1 class="text-2xl font-semibold text-white tracking-tight">Dynamic Rules Engine</h1>
+    <p class="text-sm text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+      <span class="inline-flex items-center gap-1.5 text-emerald-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
+        Parameters are live
+      </span>
+      <span class="text-slate-600">·</span>
+      <span>edits take effect without server restart · every change is logged to <span class="font-mono text-slate-400">RuleChangeLog</span></span>
+    </p>
+  </div>
+  <button id="btn-rescan"
+          class="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 hover:border-red-400 text-red-300 text-xs font-semibold uppercase tracking-wider px-3 py-1.5 rounded transition">
+    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+    Trigger Rescan
+  </button>
+</div>
+
+<!-- Rule cards -->
+<div class="space-y-4 mb-8">
+  {% for r in rules %}
+    {% set sev_cls = {
+      'High':   'bg-red-500/15 text-red-300 border-red-500/40',
+      'Medium': 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+      'Low':    'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+    }[r.severity_level] %}
+    <div class="rule-card bg-slate-900/40 border border-slate-800 rounded-lg p-5 {% if not r.is_active %}opacity-70{% endif %}"
+         data-rule-id="{{ r.rule_id }}">
+      <div class="grid grid-cols-12 gap-5">
+
+        <!-- Left: meta -->
+        <div class="col-span-4">
+          <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span class="inline-block text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border {{ sev_cls }}">{{ r.severity_level }}</span>
+            <span class="font-mono text-xs text-slate-400">{{ r.rule_code }}</span>
+            <span class="font-mono text-[10px] text-slate-600">#{{ r.rule_id }}</span>
+          </div>
+          <div class="text-sm text-white font-semibold mb-1.5">{{ r.rule_name }}</div>
+          <div class="text-xs text-slate-500 leading-relaxed">{{ r.description }}</div>
+        </div>
+
+        <!-- Middle: JSON editor -->
+        <div class="col-span-6">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-[11px] uppercase tracking-wider text-slate-500">Parameter JSON</label>
+            <span class="json-status text-[10px] text-slate-600" data-status-for="{{ r.rule_id }}">·</span>
+          </div>
+          <textarea class="parameter-editor w-full bg-slate-950 border border-slate-700 focus:border-sky-500 focus:outline-none text-slate-200 text-xs font-mono rounded px-3 py-2 leading-relaxed"
+                    rows="4"
+                    data-rule-id="{{ r.rule_id }}"
+                    spellcheck="false">{{ r.parameter_json_pretty }}</textarea>
+          <div class="json-error hidden mt-1 text-[11px] text-red-400" data-error-for="{{ r.rule_id }}"></div>
+        </div>
+
+        <!-- Right: toggle + save -->
+        <div class="col-span-2 flex flex-col gap-3">
+          <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Active</div>
+            <button type="button" role="switch"
+                    aria-checked="{{ 'true' if r.is_active else 'false' }}"
+                    data-rule-id="{{ r.rule_id }}"
+                    data-active="{{ r.is_active }}"
+                    class="rule-toggle relative inline-flex h-6 w-11 items-center rounded-full border transition
+                           {% if r.is_active %}bg-emerald-500/30 border-emerald-500/60{% else %}bg-slate-800 border-slate-700{% endif %}">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-slate-100 transition
+                           {% if r.is_active %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+            </button>
+            <div class="text-[10px] text-slate-500 mt-1 font-mono">
+              <span class="rule-toggle-label" data-label-for="{{ r.rule_id }}">
+                {% if r.is_active %}ON{% else %}OFF{% endif %}
+              </span>
+            </div>
+          </div>
+
+          <button class="save-btn flex items-center justify-center gap-1.5 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/40 hover:border-sky-400 text-sky-300 text-xs font-semibold uppercase tracking-wider px-3 py-1.5 rounded transition"
+                  data-rule-id="{{ r.rule_id }}">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Save
+          </button>
+        </div>
+
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Recent changes -->
+{% if recent_changes %}
+<div class="bg-slate-900/40 border border-slate-800 rounded-lg p-5">
+  <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+    <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    Recent Rule Changes
+    <span class="ml-auto text-[10px] text-slate-600 font-mono">immutable · last 10</span>
+  </h2>
+  <div class="space-y-1.5">
+    {% for c in recent_changes %}
+      <div class="flex items-start gap-3 text-xs py-1.5 border-b border-slate-800/50 last:border-b-0">
+        <span class="font-mono text-slate-500 num text-[11px] w-40 shrink-0">{{ c.timestamp }}</span>
+        <span class="w-32 shrink-0">
+          <span class="font-mono text-slate-300">{{ c.rule_code }}</span>
+          <span class="text-[10px] text-slate-600 ml-1">
+            {% if c.change_type == 'parameter_update' %}params{% else %}toggle{% endif %}
+          </span>
+        </span>
+        <span class="text-slate-500 font-mono truncate flex-1">
+          <span class="text-slate-600">{{ c.old_value or '∅' }}</span>
+          <span class="text-slate-600 mx-1">→</span>
+          <span class="text-slate-300">{{ c.new_value }}</span>
+        </span>
+        <span class="text-[11px] text-slate-500 shrink-0">
+          by <span class="text-slate-300">{{ c.manager_name }}</span>
+          <span class="text-slate-600 font-mono">({{ c.manager_id }})</span>
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="bg-slate-900/40 border border-slate-800 border-dashed rounded-lg p-5 text-center">
+  <div class="text-xs text-slate-500">No rule changes recorded yet. Edit a parameter or toggle active state to begin the audit trail.</div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/rules.js') }}"></script>
+{% endblock %}

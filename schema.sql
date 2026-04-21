@@ -7,6 +7,7 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS RuleChangeLog;
 DROP TABLE IF EXISTS ComplianceAuditLog;
 DROP TABLE IF EXISTS FlaggedSessions;
 DROP TABLE IF EXISTS LearningSessions;
@@ -110,4 +111,36 @@ CREATE TRIGGER trg_audit_no_delete
 BEFORE DELETE ON ComplianceAuditLog
 BEGIN
     SELECT RAISE(ABORT, 'ComplianceAuditLog is immutable — DELETE is forbidden for FSC compliance');
+END;
+
+-- ============================================================
+-- RuleChangeLog:規則變更稽核記錄(與 ComplianceAuditLog 分責)
+--   主管調整 parameter_json 或 toggle is_active 時永久留存,
+--   監管稽核時可重建「當時規則閾值為何」的歷史快照。
+-- ============================================================
+CREATE TABLE RuleChangeLog (
+    change_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id      INTEGER NOT NULL,
+    rule_code    TEXT    NOT NULL,
+    change_type  TEXT    NOT NULL CHECK (change_type IN ('parameter_update', 'toggle_active')),
+    old_value    TEXT,
+    new_value    TEXT    NOT NULL,
+    manager_id   TEXT    NOT NULL,
+    manager_name TEXT    NOT NULL,
+    timestamp    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (rule_id) REFERENCES ComplianceRules(rule_id)
+);
+
+CREATE INDEX idx_rule_change_rule ON RuleChangeLog(rule_id);
+
+CREATE TRIGGER trg_rule_change_no_update
+BEFORE UPDATE ON RuleChangeLog
+BEGIN
+    SELECT RAISE(ABORT, 'RuleChangeLog is immutable — UPDATE is forbidden for FSC compliance');
+END;
+
+CREATE TRIGGER trg_rule_change_no_delete
+BEFORE DELETE ON RuleChangeLog
+BEGIN
+    SELECT RAISE(ABORT, 'RuleChangeLog is immutable — DELETE is forbidden for FSC compliance');
 END;
