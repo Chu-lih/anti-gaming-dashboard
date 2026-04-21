@@ -26,3 +26,6 @@ database.db
 .vscode/
 .idea/
 *.swp
+
+# KGI original project briefs (confidential)
+docs/
