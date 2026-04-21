@@ -56,6 +56,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ---------- Theme toggle(記憶體狀態,預設 dark)----------
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  document.querySelectorAll('.theme-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeValue === (theme || 'dark'));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyTheme('dark');
+  document.querySelectorAll('.theme-opt').forEach(btn => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.themeValue));
+  });
+});
+
 // ---------- 更新頂部 status bar ----------
 async function refreshStatusBar() {
   try {

@@ -101,6 +101,40 @@ select.clean-select {
 }
 
 /* ================================================================
+ * Theme toggle segmented control
+ * ================================================================ */
+.theme-opt {
+  color: rgb(var(--color-slate-500));
+}
+.theme-opt:hover {
+  color: rgb(var(--color-slate-300));
+}
+.theme-opt.active {
+  background: rgb(var(--color-slate-700));
+  color: rgb(var(--color-slate-100));
+}
+
+/* ================================================================
+ * Light mode 可讀性補強
+ *   深色底用了大量 `bg-slate-900/40` 這種半透明疊加營造層次,
+ *   在 light mode 下會變幾乎看不出的白色半透明。這邊用 attribute
+ *   selector 針對 light 主題把關鍵容器加實體底色邊界。
+ * ================================================================ */
+[data-theme="light"] body {
+  color-scheme: light;
+}
+[data-theme="light"] .kpi-card,
+[data-theme="light"] .rule-card,
+[data-theme="light"] .bg-slate-900\/40,
+[data-theme="light"] .bg-slate-900\/50 {
+  background-color: rgb(var(--color-slate-900));
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+[data-theme="light"] tbody tr.flag-row:hover {
+  background-color: rgb(var(--color-slate-800) / 0.55);
+}
+
+/* ================================================================
  * Forensic Timeline — 供 timeline.html 使用的 SVG 脈衝
  * ================================================================ */
 @keyframes tab-switch-pulse {
