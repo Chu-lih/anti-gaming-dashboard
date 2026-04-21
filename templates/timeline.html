@@ -104,23 +104,26 @@
     </div>
 
     <!-- Legend -->
-    <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
-      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-400"></span>session</span>
-      <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-sky-400 rounded-sm"></span>card swipe</span>
-      <span class="flex items-center gap-1.5">
-        <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10" fill="#ef4444"/></svg>
-        tab switch
-      </span>
-      <span class="flex items-center gap-1.5">
-        <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,10 10,0 0,0" fill="#fca5a5" opacity="0.7"/></svg>
-        tab return
-      </span>
-      <span class="flex items-center gap-1.5"><span class="text-purple-400 text-sm leading-none">★</span>quiz submit</span>
+    <div class="text-right">
+      <div class="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap justify-end">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-400"></span>session</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-sky-400 rounded-sm"></span>card swipe</span>
+        <span class="flex items-center gap-1.5">
+          <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10" fill="#ef4444"/></svg>
+          tab switch
+        </span>
+        <span class="flex items-center gap-1.5">
+          <svg class="w-2.5 h-2.5" viewBox="0 0 10 10"><polygon points="5,10 10,0 0,0" fill="#fca5a5" opacity="0.7"/></svg>
+          tab return
+        </span>
+        <span class="flex items-center gap-1.5"><span class="text-purple-400 text-sm leading-none">★</span>quiz submit</span>
+      </div>
+      <div class="text-[10px] text-slate-600 mt-1">Events shown reflect only this session's telemetry</div>
     </div>
   </div>
 
   <div id="timeline-container" class="relative">
-    <svg id="timeline-svg" viewBox="0 0 1000 240" preserveAspectRatio="none" class="w-full" style="height: 240px;"></svg>
+    <svg id="timeline-svg" viewBox="0 0 1000 400" preserveAspectRatio="none" class="w-full" style="height: 400px;"></svg>
     <div id="timeline-tooltip" class="hidden absolute pointer-events-none bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5 text-[11px] text-slate-100 shadow-xl z-10 whitespace-nowrap"></div>
   </div>
 </div>
