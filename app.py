@@ -178,9 +178,12 @@ def inbox():
         """
     ).fetchone()
 
-    rules = db.execute(
-        "SELECT rule_code, rule_name FROM ComplianceRules ORDER BY rule_id"
-    ).fetchall()
+    # 帶上 severity_level 讓前端可做「依 severity 過濾 rule」的連動下拉
+    rules = [
+        dict(r) for r in db.execute(
+            "SELECT rule_code, rule_name, severity_level FROM ComplianceRules ORDER BY rule_id"
+        ).fetchall()
+    ]
 
     return render_template(
         "inbox.html",

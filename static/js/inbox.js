@@ -127,8 +127,57 @@ async function triggerRescan() {
   }
 }
 
+// ---------- Rule dropdown 依 severity 連動 ----------
+const ALL_RULES = (() => {
+  const el = document.getElementById('rules-data');
+  try { return el ? JSON.parse(el.textContent) : []; }
+  catch { return []; }
+})();
+
+function rebuildRuleDropdown(severity) {
+  const sel = document.getElementById('filter-rule');
+  if (!sel) return;
+  const previousValue = sel.value;
+  const filtered = severity ? ALL_RULES.filter(r => r.severity_level === severity) : ALL_RULES;
+
+  sel.innerHTML = '';
+  const allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = 'All rules';
+  sel.appendChild(allOpt);
+
+  if (severity && filtered.length === 0) {
+    const noOpt = document.createElement('option');
+    noOpt.value = '';
+    noOpt.disabled = true;
+    noOpt.textContent = '— no rules at this severity —';
+    noOpt.className = 'text-slate-600';
+    sel.appendChild(noOpt);
+  } else {
+    filtered.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.rule_code;
+      opt.textContent = r.rule_code;
+      opt.dataset.severity = r.severity_level;
+      sel.appendChild(opt);
+    });
+  }
+
+  // 保留原選擇(若仍在新選項集裡);否則回到 "All rules"
+  const stillValid = filtered.some(r => r.rule_code === previousValue);
+  sel.value = stillValid ? previousValue : '';
+  return sel.value !== previousValue; // 回傳是否被重置
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  ['filter-severity', 'filter-rule', 'filter-status'].forEach(id => {
+  // severity 改動 → 重建 rule dropdown,然後再載資料(一次 fetch)
+  document.getElementById('filter-severity').addEventListener('change', () => {
+    const sev = document.getElementById('filter-severity').value;
+    rebuildRuleDropdown(sev);
+    loadInbox();
+  });
+
+  ['filter-rule', 'filter-status'].forEach(id => {
     document.getElementById(id).addEventListener('change', loadInbox);
   });
 
@@ -141,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('filter-reset').addEventListener('click', () => {
     document.getElementById('filter-severity').value = '';
+    rebuildRuleDropdown('');
     document.getElementById('filter-rule').value = '';
     document.getElementById('filter-status').value = 'pending';
     document.getElementById('filter-agent').value = '';

@@ -70,9 +70,13 @@
 
     <select id="filter-rule" class="clean-select bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded px-3 py-1.5 pr-8 focus:outline-none focus:border-sky-500">
       <option value="">All rules</option>
-      {% for r in rules %}
-        <option value="{{ r.rule_code }}" {% if rule_filter == r.rule_code %}selected{% endif %}>{{ r.rule_code }}</option>
+      {% set visible_rules = rules if not severity_filter else rules | selectattr('severity_level', 'equalto', severity_filter) | list %}
+      {% for r in visible_rules %}
+        <option value="{{ r.rule_code }}" data-severity="{{ r.severity_level }}" {% if rule_filter == r.rule_code %}selected{% endif %}>{{ r.rule_code }}</option>
       {% endfor %}
+      {% if severity_filter and visible_rules | length == 0 %}
+        <option value="" disabled class="text-slate-600">— no rules at this severity —</option>
+      {% endif %}
     </select>
 
     <div class="relative">
@@ -173,5 +177,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script id="rules-data" type="application/json">{{ rules | tojson }}</script>
 <script src="{{ url_for('static', filename='js/inbox.js') }}"></script>
 {% endblock %}
